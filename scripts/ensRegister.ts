@@ -85,7 +85,9 @@ async function main() {
         if (FlashbotsBundleResolution[commitReceipt] === "BundleIncluded") {
           isCommitBundleIncluded = true;
         }
-        console.log(`Commit => Block Number: ${targetBlockNumber} | Status: ${FlashbotsBundleResolution[commitReceipt]}`);
+        console.log(
+          `Commit => Block Number: ${targetBlockNumber} | Status: ${FlashbotsBundleResolution[commitReceipt]}`
+        );
       } catch (e) {
         console.log(e);
       }
