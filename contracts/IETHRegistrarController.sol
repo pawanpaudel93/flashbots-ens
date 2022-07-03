@@ -22,10 +22,9 @@ interface IPriceOracle {
 }
 
 interface IETHRegistrarController {
-    function rentPrice(string memory name, uint256 duration)
-        external
-        view
-        returns (uint256);
+    function minCommitmentAge() external view returns (uint256);
+
+    function rentPrice(string memory name, uint256 duration) external view returns (uint256);
 
     function available(string memory name) external view returns (bool);
 

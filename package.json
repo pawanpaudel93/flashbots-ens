@@ -33,6 +33,7 @@
     "typescript": "^4.5.2"
   },
   "dependencies": {
+    "@ensdomains/eth-ens-namehash": "^2.0.15",
     "@flashbots/ethers-provider-bundle": "^0.4.4"
   }
 }

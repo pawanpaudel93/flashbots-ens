@@ -13,12 +13,17 @@ dotenv.config();
 // Go to https://hardhat.org/config/ to learn more
 
 const config: HardhatUserConfig = {
+  defaultNetwork: "hardhat",
   solidity: "0.8.4",
   networks: {
+    hardhat: {
+      forking: {
+        url: process.env.ALCHEMY_RPC_URL as string,
+      },
+    },
     goerli: {
-      url: "https://eth-goerli.g.alchemy.com/v2/wcjNX8NCjAOfhq0KKX0AyqgQeKjA-1kb",
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      url: process.env.ALCHEMY_RPC_URL,
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
   },
   gasReporter: {
