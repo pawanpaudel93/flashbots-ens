@@ -29,13 +29,15 @@ async function main() {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   // Submit our commitment to the smart contract
-  const name = namehash.normalize("१११");
+  const name = namehash.normalize("१११"); // name should be atleast 3 characters long
+  if (name.length < 3) {
+    throw new Error("Name should be atleast 3 characters long");
+  }
   const ownerAddress = await signer.getAddress();
   const duration = BigNumber.from("31536000"); // 1 year in seconds
   const isAvailable = await controller.available(name);
   if (!isAvailable) {
-    console.log(`${name} is not available`);
-    return;
+    throw new Error(`${name} is not available`);
   }
   // Creating commitment to commit to ens controller
   const commitment = await controller.makeCommitmentWithConfig(
