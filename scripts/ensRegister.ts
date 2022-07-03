@@ -29,7 +29,7 @@ async function main() {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   // Submit our commitment to the smart contract
-  const name = namehash.normalize("१4१"); // name should be atleast 3 characters long
+  const name = namehash.normalize("sharebazee"); // name should be atleast 3 characters long
   if (name.length < 3) {
     throw new Error("Name should be atleast 3 characters long");
   }
@@ -48,57 +48,25 @@ async function main() {
     ownerAddress
   );
   console.log("Commitment:", commitment);
-  let commitReceipt: FlashbotsBundleResolution;
-  let registerCount = 0;
-  let isCommitBundleIncluded: boolean;
   let isRegisterBundleIncluded: boolean;
   // Add 10% to account for price fluctuation; the difference is refunded.
   const price = (await controller.rentPrice(name, duration)).mul(110).div(100);
   const minCommitmentAge = await controller.minCommitmentAge();
   const waitDuration = minCommitmentAge.mul(1000).toNumber();
   console.log("Commiting to eth registrar controller...");
+  const commitTx = await controller.commit(commitment, {
+    maxFeePerGas: BigNumber.from(10).pow(9).mul(3),
+    maxPriorityFeePerGas: BigNumber.from(10).pow(9).mul(2),
+    gasLimit: BigNumber.from(60000),
+  });
+  await commitTx.wait();
+  console.log("Committed to eth registrar controller");
+  console.log(`Waiting for ${waitDuration / 1000}secs to register the ENS name: ${name}...`);
+  await new Promise((resolve) => setTimeout(resolve, waitDuration));
   provider.on("block", async (blockNumber) => {
     const targetBlockNumber = blockNumber + 1;
-    if (!isCommitBundleIncluded) {
-      try {
-        const bundleResponse: FlashbotsTransaction = await flashbotsProvider.sendBundle(
-          [
-            {
-              transaction: {
-                chainId: 5,
-                type: 2,
-                to: controller.address,
-                data: controller.interface.encodeFunctionData("commit", [commitment]),
-                maxFeePerGas: BigNumber.from(10).pow(9).mul(3),
-                maxPriorityFeePerGas: BigNumber.from(10).pow(9).mul(2),
-                gasLimit: BigNumber.from(60000),
-              },
-              signer,
-            },
-          ],
-          targetBlockNumber
-        );
-        if ("error" in bundleResponse) {
-          console.log("error: ", bundleResponse.error);
-        }
-        commitReceipt = await (bundleResponse as FlashbotsTransactionResponse).wait();
-        if (FlashbotsBundleResolution[commitReceipt] === "BundleIncluded") {
-          isCommitBundleIncluded = true;
-        }
-        console.log(
-          `Commit => Block Number: ${targetBlockNumber} | Status: ${FlashbotsBundleResolution[commitReceipt]}`
-        );
-      } catch (e) {
-        console.log(e);
-      }
-    }
-
-    if (isCommitBundleIncluded && !isRegisterBundleIncluded) {
-      if (registerCount === 0) {
-        console.log("Commit Bundle included so registering the name in the block number: ", targetBlockNumber);
-        await new Promise((resolve) => setTimeout(resolve, waitDuration));
-      }
-      registerCount++;
+    if (!isRegisterBundleIncluded) {
+      console.log("Registering the name in the block number: ", targetBlockNumber);
       try {
         const bundleResponse: FlashbotsTransaction = await flashbotsProvider.sendBundle(
           [
