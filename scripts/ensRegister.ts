@@ -29,7 +29,7 @@ async function main() {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   // Submit our commitment to the smart contract
-  const name = namehash.normalize("१११"); // name should be atleast 3 characters long
+  const name = namehash.normalize("१4१"); // name should be atleast 3 characters long
   if (name.length < 3) {
     throw new Error("Name should be atleast 3 characters long");
   }
@@ -56,8 +56,9 @@ async function main() {
   const price = (await controller.rentPrice(name, duration)).mul(110).div(100);
   const minCommitmentAge = await controller.minCommitmentAge();
   const waitDuration = minCommitmentAge.mul(1000).toNumber();
-  console.log("Commiting to ENS...");
+  console.log("Commiting to eth registrar controller...");
   provider.on("block", async (blockNumber) => {
+    const targetBlockNumber = blockNumber + 1;
     if (!isCommitBundleIncluded) {
       try {
         const bundleResponse: FlashbotsTransaction = await flashbotsProvider.sendBundle(
@@ -75,7 +76,7 @@ async function main() {
               signer,
             },
           ],
-          blockNumber + 1
+          targetBlockNumber
         );
         if ("error" in bundleResponse) {
           console.log("error: ", bundleResponse.error);
@@ -84,7 +85,7 @@ async function main() {
         if (FlashbotsBundleResolution[commitReceipt] === "BundleIncluded") {
           isCommitBundleIncluded = true;
         }
-        console.log("Commit => Block Number: ", blockNumber, " Status: ", FlashbotsBundleResolution[commitReceipt]);
+        console.log(`Commit => Block Number: ${targetBlockNumber} | Status: ${FlashbotsBundleResolution[commitReceipt]}`);
       } catch (e) {
         console.log(e);
       }
@@ -92,7 +93,7 @@ async function main() {
 
     if (isCommitBundleIncluded && !isRegisterBundleIncluded) {
       if (registerCount === 0) {
-        console.log("Commit Bundle included so registering the name...");
+        console.log("Commit Bundle included so registering the name in the block number: ", targetBlockNumber);
         await new Promise((resolve) => setTimeout(resolve, waitDuration));
       }
       registerCount++;
@@ -120,13 +121,13 @@ async function main() {
               signer,
             },
           ],
-          blockNumber + 1
+          targetBlockNumber
         );
         if ("error" in bundleResponse) {
           console.log("error: ", bundleResponse.error);
         }
         const receipt = await (bundleResponse as FlashbotsTransactionResponse).wait();
-        console.log("Register => Block Number: ", blockNumber, " Status: ", FlashbotsBundleResolution[receipt]);
+        console.log(`Register => Block Number: ${targetBlockNumber} | Status: ${FlashbotsBundleResolution[receipt]}`);
         if (FlashbotsBundleResolution[receipt] === "BundleIncluded") {
           isRegisterBundleIncluded = true;
           console.log("Register Bundle included");
