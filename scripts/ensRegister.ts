@@ -21,6 +21,7 @@ async function main() {
   const controller = await ethers.getContractAt("IETHRegistrarController", REGISTRAR_CONTROLLER_ADDRESS, signer);
   const flashbotsProvider = await FlashbotsBundleProvider.create(provider, signer, FLASHBOT_CONNECTION_URL, "goerli");
 
+  // Preparing arguments for the commit and register transaction
   const random = new Uint8Array(32);
   crypto.getRandomValues(random);
   const secret =
@@ -28,17 +29,21 @@ async function main() {
     Array.from(random)
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
-  // Submit our commitment to the smart contract
-  const name = namehash.normalize("sharebazee"); // name should be atleast 3 characters long
+  const name = namehash.normalize("sharebazaari"); // name should be atleast 3 characters long
   if (name.length < 3) {
     throw new Error("Name should be atleast 3 characters long");
   }
   const ownerAddress = await signer.getAddress();
-  const duration = BigNumber.from("31536000"); // 1 year in seconds
+  const duration = 31536000; // 1 year in seconds
   const isAvailable = await controller.available(name);
   if (!isAvailable) {
     throw new Error(`${name} is not available`);
   }
+  // Add 10% to account for price fluctuation; the difference is refunded.
+  const price = (await controller.rentPrice(name, duration)).mul(110).div(100);
+  const minCommitmentAge = await controller.minCommitmentAge();
+  const waitDuration = minCommitmentAge.mul(1000).toNumber(); // waitDuration in milliseconds
+
   // Creating commitment to commit to ens controller
   const commitment = await controller.makeCommitmentWithConfig(
     name,
@@ -48,21 +53,18 @@ async function main() {
     ownerAddress
   );
   console.log("Commitment:", commitment);
-  let isRegisterBundleIncluded: boolean;
-  // Add 10% to account for price fluctuation; the difference is refunded.
-  const price = (await controller.rentPrice(name, duration)).mul(110).div(100);
-  const minCommitmentAge = await controller.minCommitmentAge();
-  const waitDuration = minCommitmentAge.mul(1000).toNumber();
   console.log("Commiting to eth registrar controller...");
   const commitTx = await controller.commit(commitment, {
-    maxFeePerGas: BigNumber.from(10).pow(9).mul(3),
-    maxPriorityFeePerGas: BigNumber.from(10).pow(9).mul(2),
+    maxFeePerGas: ethers.utils.parseUnits("3", "gwei"),
+    maxPriorityFeePerGas: ethers.utils.parseUnits("2", "gwei"),
     gasLimit: BigNumber.from(60000),
   });
   await commitTx.wait();
   console.log("Committed to eth registrar controller");
+
   console.log(`Waiting for ${waitDuration / 1000}secs to register the ENS name: ${name}...`);
   await new Promise((resolve) => setTimeout(resolve, waitDuration));
+  let isRegisterBundleIncluded: boolean;
   provider.on("block", async (blockNumber) => {
     const targetBlockNumber = blockNumber + 1;
     if (!isRegisterBundleIncluded) {
@@ -84,9 +86,9 @@ async function main() {
                   PUBLIC_RESOLVER_ADDRESS,
                   ownerAddress,
                 ]),
-                maxFeePerGas: BigNumber.from(10).pow(9).mul(3),
-                maxPriorityFeePerGas: BigNumber.from(10).pow(9).mul(2),
-                gasLimit: BigNumber.from(300000),
+                maxFeePerGas: ethers.utils.parseUnits("3", "gwei"),
+                maxPriorityFeePerGas: ethers.utils.parseUnits("2", "gwei"),
+                gasLimit: 300000,
               },
               signer,
             },
@@ -98,7 +100,7 @@ async function main() {
         }
         const receipt = await (bundleResponse as FlashbotsTransactionResponse).wait();
         console.log(`Register => Block Number: ${targetBlockNumber} | Status: ${FlashbotsBundleResolution[receipt]}`);
-        if (FlashbotsBundleResolution[receipt] === "BundleIncluded") {
+        if (FlashbotsBundleResolution.BundleIncluded === receipt) {
           isRegisterBundleIncluded = true;
           console.log("Register Bundle included");
           console.log("Registered successfully!");
